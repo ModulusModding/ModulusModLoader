@@ -1,0 +1,47 @@
+# Local agent / task notes (not tracked)
+AGENTS.md
+TODO.md
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / MSBuild
+.vs/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.sln.docstates
+*.userprefs
+*_wpftmp.csproj
+*.pidb
+*.svclog
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+.coverage
+.coverage.*
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# User-specific VS props (paths to game / refs)
+ModulusModLoader.VS.User.props
+**/ModulusModExample.VS.User.props
+**/ModulusUIScaleMod.VS.User.props

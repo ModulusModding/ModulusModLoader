@@ -1,0 +1,3 @@
+[submodule "ModulusModExample"]
+	path = ModulusModExample
+	url = https://github.com/ModulusModding/ModulusModExample

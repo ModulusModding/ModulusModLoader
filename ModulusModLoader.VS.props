@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildThisFileDirectory)ModulusModLoader.VS.User.props" Condition="Exists('$(MSBuildThisFileDirectory)ModulusModLoader.VS.User.props')" />
+  <PropertyGroup>
+    <SteamLibraryDirectory Condition="'$(SteamLibraryDirectory)' == ''">H:\SteamLibrary\steamapps\common</SteamLibraryDirectory>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net48</TargetFramework>
+    <TargetFrameworkVersion Condition="'$(TargetFrameworkVersion)' == '' and '$(TargetFramework)' == 'net48'">v4.8</TargetFrameworkVersion>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <LangVersion>latest</LangVersion>
+    <ErrorReport>none</ErrorReport>
+    <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+    <NoStandardLibraries>true</NoStandardLibraries>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Configurations>Debug;Release</Configurations>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <DebugType>embedded</DebugType>
+    <WarningLevel>4</WarningLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);MSB3021;MSB3231;MSB3277</NoWarn>
+    <ModulusDirectory>$(SteamLibraryDirectory)\Modulus</ModulusDirectory>
+    <ModulusDataDirectory>$(ModulusDirectory)\Modulus_Data</ModulusDataDirectory>
+    <ModulusManagedDirectory>$(ModulusDataDirectory)\Managed</ModulusManagedDirectory>
+    <BIEDirectory>$(ModulusDirectory)\BepInEx</BIEDirectory>
+    <BIECoreDirectory>$(BIEDirectory)\core</BIECoreDirectory>
+    <BIEPluginsDirectory>$(BIEDirectory)\plugins</BIEPluginsDirectory>
+    <BIEPluginDeployDirectory>$(BIEPluginsDirectory)\$(ModName)</BIEPluginDeployDirectory>
+  </PropertyGroup>
+  <Target Name="DeployBepInExPlugin" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(DeployToBepInEx)' != 'false'">
+    <MakeDir Directories="$(BIEPluginDeployDirectory)" Condition="'$(BIEPluginDeployDirectory)' != ''" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BIEPluginDeployDirectory)" SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup>
+    <Compile Remove="bin\**" />
+    <Compile Remove="obj\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <None Remove="bin\**" />
+    <None Remove="obj\**" />
+  </ItemGroup>
+</Project>
