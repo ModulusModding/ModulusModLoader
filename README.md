@@ -10,10 +10,11 @@ A BepInEx-based mod loader for **Modulus**. It scans `Documents\My Games\Modulus
 ## Installation
 
 1. Build the loader (see **Building from Source**) or grab a release zip.
-2. Copy `ModulusModLoader.dll` into:
+2. Copy **`ModulusModLoader.dll`** and **`Newtonsoft.Json.dll`** into:
    ```
    <Modulus install>\BepInEx\plugins\ModulusModLoader\
    ```
+   (Official release zips include both files under the `ModulusModLoader\` folder; extract so both DLLs sit in that plugin folder.)
 3. Launch the game. The loader creates `Documents\My Games\Modulus\mods\` on first run.
 
 ## Startup
@@ -26,7 +27,7 @@ When **`[Updates] CheckForLoaderUpdates`** is **true** (default), the loader que
 
 Optional timeouts: **`UpdateCheckTimeoutSeconds`**, **`UpdateDownloadTimeoutSeconds`**.
 
-**Release layout (maintainers):** publish a release asset named **`ModulusModLoader.zip`** (see `LoaderPluginInfo.GithubReleaseZipAssetName`). The zip must contain **`ModulusModLoader/ModulusModLoader.dll`** so manual installs can extract straight into **`BepInEx/plugins/`**. The updater extracts that entry for the swap script.
+**Release layout (maintainers):** publish a release asset named **`ModulusModLoader.zip`** (see `LoaderPluginInfo.GithubReleaseZipAssetName`). The zip must contain **`ModulusModLoader/ModulusModLoader.dll`** and **`ModulusModLoader/Newtonsoft.Json.dll`** so manual installs and the self-updater can extract straight into **`BepInEx/plugins/ModulusModLoader/`**.
 
 ## Main menu
 

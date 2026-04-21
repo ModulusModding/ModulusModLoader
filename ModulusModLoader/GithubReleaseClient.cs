@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json.Linq;
 using UnityEngine.Networking;
 using UnityEngine;
 
@@ -31,7 +30,7 @@ internal static class GithubReleaseClient
 
         try
         {
-            var info = ParseLatestRelease(req.downloadHandler.text);
+            GithubLatestReleaseInfo? info = ParseLatestRelease(req.downloadHandler.text);
             onComplete(info);
         }
         catch (Exception ex)
@@ -69,37 +68,28 @@ internal static class GithubReleaseClient
 
     private static GithubLatestReleaseInfo? ParseLatestRelease(string json)
     {
-        var ser = new JavaScriptSerializer();
-        var root = ser.DeserializeObject(json) as Dictionary<string, object>;
-        if (root == null)
+        JObject root = JObject.Parse(json);
+        string? tagName = root["tag_name"]?.Value<string>();
+        if (string.IsNullOrEmpty(tagName))
             return null;
 
-        if (!root.TryGetValue("tag_name", out object? tagObj) || tagObj is not string tagName)
+        if (root["assets"] is not JArray assets)
             return null;
 
-        if (!root.TryGetValue("assets", out object? assetsObj) || assetsObj is not ArrayList assets)
-            return null;
-
-        string? zipUrl = null;
-        foreach (object? item in assets)
+        string expected = LoaderPluginInfo.GithubReleaseZipAssetName;
+        foreach (JToken item in assets)
         {
-            if (item is not Dictionary<string, object> asset)
+            if (item is not JObject asset)
                 continue;
-            if (!asset.TryGetValue("name", out object? nameObj) || nameObj is not string name)
+            string? name = asset["name"]?.Value<string>();
+            if (!string.Equals(name, expected, StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (!string.Equals(name, LoaderPluginInfo.GithubReleaseZipAssetName, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (asset.TryGetValue("browser_download_url", out object? urlObj) && urlObj is string url)
-            {
-                zipUrl = url;
-                break;
-            }
+            string? zipUrl = asset["browser_download_url"]?.Value<string>();
+            if (!string.IsNullOrEmpty(zipUrl))
+                return new GithubLatestReleaseInfo(tagName!, zipUrl!);
         }
 
-        if (string.IsNullOrEmpty(zipUrl))
-            return null;
-
-        return new GithubLatestReleaseInfo(tagName, zipUrl!);
+        return null;
     }
 }
 

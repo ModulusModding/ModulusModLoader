@@ -5,7 +5,7 @@
     <AssemblyName>$(ModName)</AssemblyName>
     <RootNamespace>ModulusModLoader</RootNamespace>
     <TargetFramework>net48</TargetFramework>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -18,6 +18,6 @@
   </PropertyGroup>
   <Import Project="$(MSBuildThisFileDirectory)..\ModulusModLoader.VS.References.props" />
   <ItemGroup>
-    <Reference Include="System.Web.Extensions" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

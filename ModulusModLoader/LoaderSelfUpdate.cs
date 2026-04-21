@@ -84,23 +84,22 @@ internal static class LoaderSelfUpdate
         {
             string pluginDir = Path.GetDirectoryName(dllPath)!;
             var installDir = new DirectoryInfo(pluginDir);
-            string dllFileName = Path.GetFileName(dllPath);
 
             using FileStream stream = File.OpenRead(tempZip);
             using ZipArchive archive = new(stream, ZipArchiveMode.Read, leaveOpen: false);
 
-            LoaderUpdateSequence seq = LoaderUpdateSequence.Make(
-                installDir,
-                archive,
-                filter: IsLoaderDllZipEntry,
-                mapPath: _ => dllFileName);
-
-            if (seq.Actions.Count == 0)
+            if (!ZipContainsLoaderDll(archive))
             {
                 log.LogError(
                     $"Update zip did not contain {LoaderPluginInfo.GithubReleaseDllEntryPath} (expected inside {LoaderPluginInfo.GithubReleaseZipAssetName}).");
                 yield break;
             }
+
+            LoaderUpdateSequence seq = LoaderUpdateSequence.Make(
+                installDir,
+                archive,
+                filter: IsLoaderUpdateZipEntry,
+                mapPath: MapLoaderUpdateZipEntry);
 
             LoaderUpdateResult result = seq.Execute(log);
             if (result != LoaderUpdateResult.Success)
@@ -160,7 +159,22 @@ internal static class LoaderSelfUpdate
         }
     }
 
-    private static bool IsLoaderDllZipEntry(ZipArchiveEntry entry)
+    private static bool ZipContainsLoaderDll(ZipArchive archive)
+    {
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            if (ZipEntryMatchesPath(entry, LoaderPluginInfo.GithubReleaseDllEntryPath))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsLoaderUpdateZipEntry(ZipArchiveEntry entry) =>
+        ZipEntryMatchesPath(entry, LoaderPluginInfo.GithubReleaseDllEntryPath)
+        || ZipEntryMatchesPath(entry, LoaderPluginInfo.GithubReleaseNewtonsoftEntryPath);
+
+    private static bool ZipEntryMatchesPath(ZipArchiveEntry entry, string expectedZipPath)
     {
         if (string.IsNullOrEmpty(entry.Name))
             return false;
@@ -169,8 +183,22 @@ internal static class LoaderSelfUpdate
         if (normalized == null)
             return false;
 
-        string expected = LoaderPluginInfo.GithubReleaseDllEntryPath.Replace('\\', '/');
+        string expected = expectedZipPath.Replace('\\', '/');
         return normalized.Equals(expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string MapLoaderUpdateZipEntry(ZipArchiveEntry entry)
+    {
+        string main = LoaderPluginInfo.GithubReleaseDllEntryPath.Replace('\\', '/');
+        string newton = LoaderPluginInfo.GithubReleaseNewtonsoftEntryPath.Replace('\\', '/');
+        string? normalized = NormalizeZipEntryPath(entry.FullName);
+        if (normalized == null)
+            throw new InvalidOperationException($"Invalid zip entry path: {entry.FullName}");
+        if (normalized.Equals(main, StringComparison.OrdinalIgnoreCase))
+            return Path.GetFileName(main);
+        if (normalized.Equals(newton, StringComparison.OrdinalIgnoreCase))
+            return Path.GetFileName(newton);
+        throw new InvalidOperationException($"Unexpected zip entry: {entry.FullName}");
     }
 
     private static void TryDeleteQuiet(string path)

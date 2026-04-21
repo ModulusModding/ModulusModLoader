@@ -35,6 +35,7 @@
   <Target Name="DeployBepInExPlugin" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(DeployToBepInEx)' != 'false'">
     <MakeDir Directories="$(BIEPluginDeployDirectory)" Condition="'$(BIEPluginDeployDirectory)' != ''" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BIEPluginDeployDirectory)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)Newtonsoft.Json.dll" DestinationFolder="$(BIEPluginDeployDirectory)" SkipUnchangedFiles="true" Condition="Exists('$(TargetDir)Newtonsoft.Json.dll')" />
   </Target>
   <ItemGroup>
     <Compile Remove="bin\**" />
