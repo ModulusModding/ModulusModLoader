@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using ModulusModLoader.Config;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -28,6 +29,8 @@ internal sealed class ModListController : MonoBehaviour
     internal TextMeshProUGUI InfoDescTmp        = null!;
     internal GameObject      InfoPlaceholderGo  = null!;
     internal GameObject      InfoContentGo      = null!;
+    internal RectTransform?  SettingsContentRt;
+    internal GameObject?     SettingsHeaderGo;
 
     private int                    _selectedIndex = -1;
     private readonly List<ModRowItem> _rows       = new();
@@ -340,6 +343,15 @@ internal sealed class ModListController : MonoBehaviour
         }
 
         InfoDescTmp.text = desc.Length > 0 ? desc.ToString().Trim() : "<color=#667>No description provided.</color>";
+
+        // Build the per-mod config panel under the Settings header.
+        if (SettingsContentRt != null)
+        {
+            ModConfigPanel.Populate(SettingsContentRt, d.EffectiveModId, Style, d.RootPath);
+            if (SettingsHeaderGo != null)
+                SettingsHeaderGo.SetActive(true);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(SettingsContentRt);
+        }
     }
 
     // ── Static helpers ─────────────────────────────────────────────────────────

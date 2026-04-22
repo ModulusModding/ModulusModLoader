@@ -34,6 +34,95 @@ Optional timeouts: **`UpdateCheckTimeoutSeconds`**, **`UpdateDownloadTimeoutSeco
 - **Status strip** (bottom-left): loader version and how many plugin mods were loaded (no paths or mod names). Scales with screen height.
 - **Mods** button: opens a panel listing every mod folder (with `About/About.xml`). Toggle mods **on** or **off**; changes are saved to `Documents\My Games\Modulus\mod_registry.json` and apply on the **next** game launch (restart required).
 
+## Keybinds (vanilla Settings → Controls)
+
+Mods can register actions that appear in the **same** Controls screen as the base game. Each registration supplies a **category** string: that text is the **section header** (like vanilla **Tools** or **Inside Operators**), and every binding that uses the same category string is listed under that header. If you omit the category overload, the default header is **Mods**. Bindings are stored in the game's normal settings save (same `InputActionAsset` override JSON as vanilla).
+
+Defaults can be expressed with strongly-typed enums (`ModKey`, `ModMouseButton`) instead of raw `<Keyboard>/...` strings. Modulus does not support gamepads, so no gamepad enum is exposed:
+
+```csharp
+using ModulusModLoader;
+using ModulusModLoader.Keybinds;
+using UnityEngine.InputSystem;
+
+InputAction? myAction = ModKeybind.Register(
+    pluginGuidOrModId,
+    "ToggleOverlay",
+    "My mod: Toggle overlay",
+    ModKey.F9,                  // or ModMouseButton.Middle, etc.
+    PluginInfo.PluginName);     // section header in Controls
+
+if (myAction != null && myAction.WasPressedThisFrame()) { /* ... */ }
+```
+
+The original string overload is still supported for cases where you need a path the enums do not cover (`ModKeybind.Register(modId, actionId, name, "<Keyboard>/numpad7", category)`).
+
+If `Register` returns `null`, the settings `InputActionAsset` is not in memory yet; call `Register` again from `Start` or after `ModGameLifecycle.GameStarted`.
+
+Register from plugin `Awake` when possible (or as soon as your mod loads). After **second-stage** mods finish loading, the loader refreshes the rebind runtime so late registrations still work; reopen **Settings → Controls** if that tab was already open.
+
+## Localization (`ModL10n`)
+
+Ship one JSON file per language under `<YourMod>/Localization/`:
+
+```
+YourMod/
+  Localization/
+    en.json
+    de.json
+    fr.json
+```
+
+JSON is either flat (`"key": "value"`) or nested (collapsed with dot keys, e.g. `greeting.hello`). Register the folder once during `Awake` and look strings up by key. The catalog reloads automatically when the player switches language in vanilla settings.
+
+```csharp
+using System.IO;
+using System.Reflection;
+using ModulusModLoader.Localization;
+
+string pluginFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
+ModL10n.Register(PluginInfo.PluginGuid, pluginFolder);   // expects {pluginFolder}/Localization/<lang>.json
+
+string greeting = ModL10n.Get(PluginInfo.PluginGuid, "greeting.hello", fallback: "Hello");
+string formatted = ModL10n.Format(PluginInfo.PluginGuid, "log.keybindPressed", greeting, scale);
+```
+
+Missing keys fall back to (1) the configured fallback language (default `en`, change with `ModL10n.SetFallbackLanguage`), (2) the supplied `fallback` argument, (3) the literal key.
+
+## Mod settings panel (BepInEx `ConfigEntry` editor)
+
+Anything you bind via BepInEx's `Config.Bind(...)` automatically appears in the **Mods** menu's **SETTINGS** subsection (under the About text) when your mod is selected:
+
+```csharp
+using BepInEx.Configuration;
+
+private ConfigEntry<bool>  _verbose;
+private ConfigEntry<int>   _logEveryN;
+private ConfigEntry<float> _scale;
+private ConfigEntry<MyEnum> _mode;
+
+private void Awake() {
+    _verbose   = Config.Bind("General", "Verbose", true, "Log extra detail.");
+    _logEveryN = Config.Bind("General", "LogEveryNFrames", 60,
+                    new ConfigDescription("Log heartbeat cadence.", new AcceptableValueRange<int>(1, 600)));
+    _scale     = Config.Bind("Tuning", "Scale", 1.0f,
+                    new ConfigDescription("Tunable float.", new AcceptableValueRange<float>(0.1f, 5f)));
+    _mode      = Config.Bind("General", "Mode", MyEnum.A, "Pick a mode.");
+}
+```
+
+The loader picks the editor based on the entry type:
+
+| Type | Editor |
+|------|--------|
+| `bool` | ON/OFF pill toggle |
+| `enum`, `AcceptableValueList<string>` | Dropdown |
+| `int`/`float` + `AcceptableValueRange<T>` | Slider with value label |
+| Other numeric types | Numeric `TMP_InputField` |
+| Anything else (incl. `string`) | Text `TMP_InputField` |
+
+Edits are written back to the live `ConfigEntry` and BepInEx persists them to `BepInEx/config/<plugin>.cfg` immediately.
+
 ## Creating a Mod
 
 See the **ModulusModExample** project for a working template.
@@ -70,11 +159,13 @@ They load **before** your plugin’s **`Awake`**.
 
 ### Plugin Skeleton
 
+If your project's `*.VS.props` imports the repo-level `Modulus.Mod.targets` (the example template does), then `PluginInfo.PluginGuid` / `PluginName` / `PluginVersion` are codegened from `About.xml` at build time and the `[BepInPlugin]` attribute can reference them directly. **You do not need to maintain a `PluginInfo.cs` file.**
+
 ```csharp
 using BepInEx;
 using ModulusModLoader;
 
-[BepInPlugin("com.yourname.modulus.yourmod", "Your Mod", "0.1.0")]
+[BepInPlugin(PluginInfo.PluginGuid, PluginInfo.PluginName, PluginInfo.PluginVersion)]
 [BepInDependency(LoaderPluginInfo.Guid)]
 public class YourModPlugin : BaseUnityPlugin
 {
@@ -82,11 +173,12 @@ public class YourModPlugin : BaseUnityPlugin
     {
         Logger.LogInfo("Hello from YourMod!");
 
-        // Subscribe to lifecycle events
         ModGameLifecycle.FactoryLoaded += () => Logger.LogInfo("Factory loaded!");
     }
 }
 ```
+
+If you choose not to use `Modulus.Mod.targets`, hand-write the same constants and pass them as raw strings.
 
 ### Lifecycle Events
 
@@ -134,17 +226,15 @@ public class YourModPlugin : BaseUnityPlugin
 ```
 ModulusModLoader.sln              ← builds ModulusModLoader only
 ModulusModLoader/
-  ├── ModulusModLoaderPlugin.cs   (entry point)
-  ├── ModsRootPluginLoader.cs     (second-stage mod scanner/loader)
-  ├── ModGameLifecycle.cs         (public lifecycle events for mods)
-  ├── ModAssetBundles.cs            (public API + bundle load from mod folders)
-  ├── ModLoadProgress.cs            (splash IMGUI strip while mods load)
-  ├── LoaderSelfUpdate.cs           (GitHub download + zip apply + restart)
-  ├── LoaderUpdateSequence.cs       (in-process zip: backup, extract, rollback)
-  ├── LoaderUpdateGuiPrompt.cs      (startup Yes/No IMGUI for update)
-  ├── GithubReleaseClient.cs        (GitHub API + zip download)
-  ├── Metadata/                   (About.xml parsing)
-  └── Patches/                    (Harmony patches on game classes)
+  ├── Bootstrap/    (BepInPlugin entry, LoaderConfig, LoaderPluginInfo, status buffer, plugin-info reflection)
+  ├── Mods/         (folder discovery + ordering + registry + lifecycle events + asset bundles + load progress)
+  │   └── Metadata/ (About.xml parsing)
+  ├── Keybinds/     (ModKeybind public API, ModKey/ModMouseButton enums, runtime injection)
+  ├── Localization/ (ModL10n - per-mod JSON catalogs, language hot reload)
+  ├── Config/       (ModConfigPanel - vanilla-styled BepInEx ConfigEntry editors)
+  ├── Menu/         (in-game UI: HUD, main-menu button, mods overlay, list controller)
+  ├── Update/       (GitHub Releases self-update)
+  └── Patches/      (Harmony patches on game classes)
 ModulusModExample/                ← optional Git submodule; build its .csproj separately
 ```
 

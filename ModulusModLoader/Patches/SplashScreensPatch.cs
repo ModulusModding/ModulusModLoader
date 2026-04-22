@@ -1,6 +1,7 @@
 using System.Collections;
 using BepInEx.Logging;
 using HarmonyLib;
+using ModulusModLoader;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -47,6 +48,8 @@ internal static class SplashScreensStartPatch
             try
             {
                 yield return ModsRootPluginLoader.LoadAllCoroutine(log);
+                ModKeybindIntegration.OnModsLoadedStageComplete();
+                ModKeybindIntegration.EnableModMapForGameplay();
                 ModGameLifecycle.RaiseGameStarted();
             }
             finally
@@ -70,6 +73,8 @@ internal static class SplashScreensStartPatch
             ModLoadProgress.End();
         }
 
+        ModKeybindIntegration.OnModsLoadedStageComplete();
+        ModKeybindIntegration.EnableModMapForGameplay();
         ModGameLifecycle.RaiseGameStarted();
     }
 
