@@ -159,7 +159,7 @@ They load **before** your plugin’s **`Awake`**.
 
 ### Plugin Skeleton
 
-If your project's `*.VS.props` imports the repo-level `Modulus.Mod.targets` (the example template does), then `PluginInfo.PluginGuid` / `PluginName` / `PluginVersion` are codegened from `About.xml` at build time and the `[BepInPlugin]` attribute can reference them directly. **You do not need to maintain a `PluginInfo.cs` file.**
+If your project's `*.VS.props` imports **`Modulus.Mod.targets` next to it** (the example template does), then `PluginInfo.PluginGuid` / `PluginName` / `PluginVersion` are codegened from `About.xml` at build time and the `[BepInPlugin]` attribute can reference them directly. **You do not need to maintain a `PluginInfo.cs` file.**
 
 ```csharp
 using BepInEx;
