@@ -3,6 +3,7 @@ using System.Collections;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using ModulusModLoader.Localization;
 
 namespace ModulusModLoader;
 
@@ -16,6 +17,7 @@ public class ModulusModLoaderPlugin : BaseUnityPlugin
     private void Awake()
     {
         Log = Logger;
+        ModL10n.InstallLanguageChangeListener();
         LoaderConfig.Bind(Config);
         string root = ModPaths.GetUserModsRoot(Log);
         Log.LogInfo($"{LoaderPluginInfo.Name} v{LoaderPluginInfo.Version} | User mods folder: {root}");

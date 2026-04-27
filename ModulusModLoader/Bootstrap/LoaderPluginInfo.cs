@@ -8,7 +8,7 @@ public static class LoaderPluginInfo
 {
     public const string Guid = "com.zedle.modulus.modloader";
     public const string Name = "ModulusModLoader";
-    public const string Version = "0.1.1";
+    public const string Version = "0.1.5";
 
     /// <summary>GitHub org for self-update checks (<c>releases/latest</c>).</summary>
     public const string GithubUpdateOwner = "ModulusModding";

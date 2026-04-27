@@ -203,6 +203,15 @@ internal static class ModsMenuPanel
         var descScroll = BuildDescScrollRect(infoContent.transform, style);
         var infoDesc   = descScroll.GetComponentInChildren<TextMeshProUGUI>();
 
+        // ─── Settings section (mod-defined BepInEx config items) ──────────────
+        var settingsHeader = AddTmp(infoContent.transform, "SETTINGS",
+            style.Font, style.FontSizeSmall * 1.05f, style.ColorTextMuted,
+            FontStyles.Bold | FontStyles.UpperCase, TextAlignmentOptions.MidlineLeft);
+        settingsHeader.AddComponent<LayoutElement>().minHeight = style.FontSizeSmall * 2f;
+
+        var settingsScroll  = BuildSettingsScrollRect(infoContent.transform, style);
+        var settingsContent = settingsScroll.content;
+
         // ─── Scroll rect for the mod list ────────────────────────────────────
         var listScroll = BuildListScrollRect(leftPane.transform);
 
@@ -245,6 +254,8 @@ internal static class ModsMenuPanel
         ctrl.InfoDescTmp      = infoDesc;
         ctrl.InfoPlaceholderGo = placeholder;
         ctrl.InfoContentGo    = infoContent;
+        ctrl.SettingsContentRt = settingsContent;
+        ctrl.SettingsHeaderGo  = settingsHeader;
 
         ctrl.Init();
 
@@ -308,6 +319,55 @@ internal static class ModsMenuPanel
         contentVlg.childControlWidth  = true;
         contentVlg.childForceExpandWidth  = true;
         contentVlg.childForceExpandHeight = false;
+
+        var csf = contentGo.AddComponent<ContentSizeFitter>();
+        csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        csf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+
+        scroll.viewport = vp.GetComponent<RectTransform>();
+        scroll.content  = contentRt;
+
+        return scroll;
+    }
+
+    /// Vertical-scrolling content area used for mod-defined config controls.
+    /// The content has a VerticalLayoutGroup and ContentSizeFitter so each
+    /// row added by ModConfigPanel sizes itself naturally.
+    private static ScrollRect BuildSettingsScrollRect(Transform parent, GameUiStyle style)
+    {
+        var scrollGo  = new GameObject("SettingsScroll");
+        scrollGo.transform.SetParent(parent, false);
+        scrollGo.AddComponent<Image>().color = new Color(
+            style.ColorPanelBg.r * 0.7f, style.ColorPanelBg.g * 0.7f,
+            style.ColorPanelBg.b * 0.7f, 0.6f);
+        scrollGo.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+        var scroll            = scrollGo.AddComponent<ScrollRect>();
+        scroll.horizontal     = false;
+        scroll.vertical       = true;
+        scroll.movementType   = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 40f;
+
+        var vp = FullStretch("Viewport", scrollGo.transform);
+        vp.AddComponent<RectMask2D>();
+
+        var contentGo  = new GameObject("Content");
+        contentGo.transform.SetParent(vp.transform, false);
+        var contentRt  = contentGo.AddComponent<RectTransform>();
+        contentRt.anchorMin       = new Vector2(0f, 1f);
+        contentRt.anchorMax       = new Vector2(1f, 1f);
+        contentRt.pivot           = new Vector2(0.5f, 1f);
+        contentRt.anchoredPosition = Vector2.zero;
+        contentRt.sizeDelta       = Vector2.zero;
+
+        var vlg = contentGo.AddComponent<VerticalLayoutGroup>();
+        vlg.spacing                 = 4f;
+        vlg.padding                 = new RectOffset(8, 8, 6, 6);
+        vlg.childAlignment          = TextAnchor.UpperLeft;
+        vlg.childControlHeight      = true;
+        vlg.childControlWidth       = true;
+        vlg.childForceExpandHeight  = false;
+        vlg.childForceExpandWidth   = true;
 
         var csf = contentGo.AddComponent<ContentSizeFitter>();
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
