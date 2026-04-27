@@ -15,7 +15,8 @@ namespace ModulusModLoader.Localization;
 ///
 /// Files are JSON dictionaries (<c>"key": "value"</c>) or nested JSON objects (dot-keys join nested paths).
 /// Missing keys fall back to (1) the configured fallback language, (2) the supplied <c>fallback</c>
-/// argument, (3) the literal key. The catalog reloads automatically when the player switches language.
+/// argument, (3) the literal key. The loader calls <see cref="InstallLanguageChangeListener"/> early so catalogs
+/// reload on <c>LocalizationUtility.OnLanguageUpdate</c> before most game UI handlers run.
 /// </summary>
 public static class ModL10n
 {
@@ -51,6 +52,28 @@ public static class ModL10n
     }
 
     /// <summary>
+    /// Subscribe to the game's language-changed event and sync <see cref="CurrentLanguage"/> before any mod calls <see cref="Register"/>.
+    /// The loader calls this from its own plugin <c>Awake</c> so catalogs reload before other <c>LocalizationUtility.OnLanguageUpdate</c> handlers run.
+    /// </summary>
+    public static void InstallLanguageChangeListener()
+    {
+        lock (Sync)
+        {
+            if (_hookInstalled) return;
+            try
+            {
+                _currentLanguage = NormalizeCode(LocalizationUtility.CurrentLanguage.ToString());
+                LocalizationUtility.OnLanguageUpdate += OnGameLanguageUpdate;
+                _hookInstalled = true;
+            }
+            catch (Exception ex)
+            {
+                Log()?.LogWarning($"ModL10n: cannot subscribe to OnLanguageUpdate yet ({ex.Message}); will retry on next Register.");
+            }
+        }
+    }
+
+    /// <summary>
     /// Register a folder of language files for <paramref name="modId"/>.
     /// Pass the mod's distribution root - the loader resolves <c>{root}/{folderName}</c>.
     /// Re-registering replaces the previous folder for the same mod.
@@ -61,7 +84,7 @@ public static class ModL10n
         if (string.IsNullOrWhiteSpace(distributionFolder))
             throw new ArgumentException("distributionFolder is required.", nameof(distributionFolder));
 
-        EnsureLanguageHook();
+        InstallLanguageChangeListener();
 
         string root = Path.Combine(distributionFolder, folderName);
         Catalog catalog = new(modId, root);
@@ -106,24 +129,6 @@ public static class ModL10n
         ReloadAll();
         try { LanguageChanged?.Invoke(); }
         catch (Exception ex) { Log()?.LogWarning($"ModL10n: language change handler threw: {ex.Message}"); }
-    }
-
-    private static void EnsureLanguageHook()
-    {
-        lock (Sync)
-        {
-            if (_hookInstalled) return;
-            try
-            {
-                _currentLanguage = NormalizeCode(LocalizationUtility.CurrentLanguage.ToString());
-                LocalizationUtility.OnLanguageUpdate += OnGameLanguageUpdate;
-                _hookInstalled = true;
-            }
-            catch (Exception ex)
-            {
-                Log()?.LogWarning($"ModL10n: cannot subscribe to OnLanguageUpdate yet ({ex.Message}); will retry on next Register.");
-            }
-        }
     }
 
     private static void OnGameLanguageUpdate()

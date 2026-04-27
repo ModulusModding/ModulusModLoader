@@ -32,7 +32,7 @@ Optional timeouts: **`UpdateCheckTimeoutSeconds`**, **`UpdateDownloadTimeoutSeco
 ## Main menu
 
 - **Status strip** (bottom-left): loader version and how many plugin mods were loaded (no paths or mod names). Scales with screen height.
-- **Mods** button: opens a panel listing every mod folder (with `About/About.xml`). Toggle mods **on** or **off**; changes are saved to `Documents\My Games\Modulus\mod_registry.json` and apply on the **next** game launch (restart required).
+- **Mods** button: opens a panel listing every mod folder (with `About/About.xml`). Toggle mods **on** or **off**; changes are saved to `Documents\My Games\Modulus\mod_registry.json` and apply on the **next** game launch (restart required). The button is cloned from the Manual row but **`LocalizedTMPText` is removed** from the clone so switching language does not reuse the Manual string (Handbuch).
 
 ## Keybinds (vanilla Settings → Controls)
 
@@ -48,14 +48,17 @@ using UnityEngine.InputSystem;
 InputAction? myAction = ModKeybind.Register(
     pluginGuidOrModId,
     "ToggleOverlay",
-    "My mod: Toggle overlay",
+    "My mod: Toggle overlay",   // fallback if the key below is missing
     ModKey.F9,                  // or ModMouseButton.Middle, etc.
-    PluginInfo.PluginName);     // section header in Controls
+    PluginInfo.PluginName,      // section header in Controls
+    displayNameLocalizationKey: "keybind.toggleOverlay");   // optional: row label tracks language
 
 if (myAction != null && myAction.WasPressedThisFrame()) { /* ... */ }
 ```
 
-The original string overload is still supported for cases where you need a path the enums do not cover (`ModKeybind.Register(modId, actionId, name, "<Keyboard>/numpad7", category)`).
+The original string overload is still supported for cases where you need a path the enums do not cover (`ModKeybind.Register(modId, actionId, name, "<Keyboard>/numpad7", category)`). Pass **`displayNameLocalizationKey`** when the row label should follow **`ModL10n`** after the player changes language (otherwise the name is fixed at registration time).
+
+The loader subscribes to **`LocalizationUtility.OnLanguageUpdate`** at startup so **`ModL10n`** catalogs reload before most vanilla UI handlers run.
 
 If `Register` returns `null`, the settings `InputActionAsset` is not in memory yet; call `Register` again from `Start` or after `ModGameLifecycle.GameStarted`.
 
@@ -73,7 +76,7 @@ YourMod/
     fr.json
 ```
 
-JSON is either flat (`"key": "value"`) or nested (collapsed with dot keys, e.g. `greeting.hello`). Register the folder once during `Awake` and look strings up by key. The catalog reloads automatically when the player switches language in vanilla settings.
+JSON is either flat (`"key": "value"`) or nested (collapsed with dot keys, e.g. `bepinex-config.entries.general.verbose.label`). Register the folder once during `Awake` and look strings up by key. Active language comes from the game's **`LanguageCode`** (e.g. `DE` maps to **`de.json`**). Catalogs reload when the player switches language in vanilla settings.
 
 ```csharp
 using System.IO;
@@ -83,7 +86,7 @@ using ModulusModLoader.Localization;
 string pluginFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
 ModL10n.Register(PluginInfo.PluginGuid, pluginFolder);   // expects {pluginFolder}/Localization/<lang>.json
 
-string greeting = ModL10n.Get(PluginInfo.PluginGuid, "greeting.hello", fallback: "Hello");
+string label = ModL10n.Get(PluginInfo.PluginGuid, "bepinex-config.entries.general.verbose.label", "Verbose");
 string formatted = ModL10n.Format(PluginInfo.PluginGuid, "log.keybindPressed", greeting, scale);
 ```
 
@@ -122,6 +125,17 @@ The loader picks the editor based on the entry type:
 | Anything else (incl. `string`) | Text `TMP_InputField` |
 
 Edits are written back to the live `ConfigEntry` and BepInEx persists them to `BepInEx/config/<plugin>.cfg` immediately.
+
+**Localized labels at runtime (optional):** keep **English** strings in `Config.Bind` / `ConfigDescription` (what you want in the `.cfg` file). In `Localization/<lang>.json`, put UI strings under a top-level **`bepinex-config`** object (see **`ModConfigL10nKeys.RootPrefix`**). The Mods **SETTINGS** panel refreshes on **`ModL10n.LanguageChanged`**. Normalization: BepInEx section and key names are trimmed, lowercased, and spaces become `_` (e.g. `LogEveryNFrames` → `logeverynframes`).
+
+| UI | Nested path (under `bepinex-config` in JSON) |
+|----|---------------------------------------------|
+| Section subtitle | `sections.{section}` |
+| Row title (optional) | `entries.{section}.{key}.label` |
+| Description body | `entries.{section}.{key}.description` |
+| Enum dropdown row | `enums.{section}.{key}.{member}` (member lowercased) |
+
+Flattened dot keys match **`ModConfigL10nKeys`** (e.g. `bepinex-config.entries.general.verbose.label`). If a key is missing, the UI falls back to the BepInEx **key** (row title) or the **description string** from your bind call.
 
 ## Creating a Mod
 

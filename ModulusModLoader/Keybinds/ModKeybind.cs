@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ModulusModLoader.Keybinds;
+using ModulusModLoader.Localization;
 using UnityEngine.InputSystem;
 
 namespace ModulusModLoader;
@@ -19,8 +20,9 @@ public static class ModKeybind
         string modId,
         string actionId,
         string displayName,
-        string defaultBindingPath) =>
-        Register(modId, actionId, displayName, defaultBindingPath, category: "Mods");
+        string defaultBindingPath,
+        string? displayNameLocalizationKey = null) =>
+        Register(modId, actionId, displayName, defaultBindingPath, category: "Mods", displayNameLocalizationKey);
 
     /// <summary>
     /// Registers a keybind. Safe to call from plugin <c>Awake</c> / <c>OnEnable</c>.
@@ -31,7 +33,8 @@ public static class ModKeybind
     /// </param>
     /// <param name="modId">Stable mod id (e.g. BepInEx plugin GUID or About.xml ModID).</param>
     /// <param name="actionId">Unique id within the mod (letters, digits, underscore).</param>
-    /// <param name="displayName">Shown as the row label (plain text).</param>
+    /// <param name="displayName">Row label when <paramref name="displayNameLocalizationKey"/> is null; otherwise the fallback passed to <see cref="ModL10n.Get(string,string,string?)"/>.</param>
+    /// <param name="displayNameLocalizationKey">When set, the Controls row label is resolved with <see cref="ModL10n.Get(string,string,string?)"/> whenever the UI refreshes so it follows the active language.</param>
     /// <param name="defaultBindingPath">New Input System path, e.g. <c>&lt;Keyboard&gt;/f5</c>.</param>
     /// <returns>
     /// The live <see cref="InputAction"/> when the game's settings asset is available; otherwise <c>null</c>
@@ -42,7 +45,8 @@ public static class ModKeybind
         string actionId,
         string displayName,
         string defaultBindingPath,
-        string category)
+        string category,
+        string? displayNameLocalizationKey = null)
     {
         if (string.IsNullOrWhiteSpace(modId)) throw new ArgumentException("modId is required.", nameof(modId));
         if (string.IsNullOrWhiteSpace(actionId)) throw new ArgumentException("actionId is required.", nameof(actionId));
@@ -51,8 +55,17 @@ public static class ModKeybind
             throw new ArgumentException("defaultBindingPath is required.", nameof(defaultBindingPath));
         if (string.IsNullOrWhiteSpace(category)) throw new ArgumentException("category is required.", nameof(category));
 
+        string? trimmedLocKey = null;
+        if (displayNameLocalizationKey != null)
+        {
+            string t = displayNameLocalizationKey.Trim();
+            if (t.Length > 0)
+                trimmedLocKey = t;
+        }
+
         return ModKeybindIntegration.Register(
-            modId.Trim(), actionId.Trim(), displayName.Trim(), defaultBindingPath.Trim(), category.Trim());
+            modId.Trim(), actionId.Trim(), displayName.Trim(), defaultBindingPath.Trim(), category.Trim(),
+            trimmedLocKey);
     }
 
     /// <summary>
@@ -63,8 +76,9 @@ public static class ModKeybind
         string actionId,
         string displayName,
         ModKey defaultKey,
-        string category) =>
-        Register(modId, actionId, displayName, ModBindingPath.For(defaultKey), category);
+        string category,
+        string? displayNameLocalizationKey = null) =>
+        Register(modId, actionId, displayName, ModBindingPath.For(defaultKey), category, displayNameLocalizationKey);
 
     /// <summary>
     /// Registers a keybind whose default is a <see cref="ModMouseButton"/>.
@@ -74,8 +88,9 @@ public static class ModKeybind
         string actionId,
         string displayName,
         ModMouseButton defaultButton,
-        string category) =>
-        Register(modId, actionId, displayName, ModBindingPath.For(defaultButton), category);
+        string category,
+        string? displayNameLocalizationKey = null) =>
+        Register(modId, actionId, displayName, ModBindingPath.For(defaultButton), category, displayNameLocalizationKey);
 
     /// <summary>Try resolve a registered action (after <see cref="Register"/>).</summary>
     public static bool TryGetAction(string modId, string actionId, out InputAction? action)
@@ -105,19 +120,23 @@ public sealed class ModKeybindRegistration
         string displayName,
         string defaultBindingPath,
         Guid bindingGuid,
-        string category)
+        string category,
+        string? displayNameLocalizationKey = null)
     {
-        ModId              = modId;
-        ActionId           = actionId;
-        DisplayName        = displayName;
-        DefaultBindingPath = defaultBindingPath;
-        BindingGuid        = bindingGuid;
-        Category           = category;
+        ModId                        = modId;
+        ActionId                     = actionId;
+        DisplayName                  = displayName;
+        DefaultBindingPath           = defaultBindingPath;
+        BindingGuid                  = bindingGuid;
+        Category                     = category;
+        DisplayNameLocalizationKey   = displayNameLocalizationKey;
     }
 
     public string ModId { get; }
     public string ActionId { get; }
     public string DisplayName { get; }
+    /// <summary>When non-null, the Controls UI resolves the label via <see cref="ModL10n"/> instead of using <see cref="DisplayName"/> alone.</summary>
+    public string? DisplayNameLocalizationKey { get; }
     public string DefaultBindingPath { get; }
     public Guid BindingGuid { get; }
     /// <summary>Controls section header; same value across bindings merges them under one subtitle.</summary>

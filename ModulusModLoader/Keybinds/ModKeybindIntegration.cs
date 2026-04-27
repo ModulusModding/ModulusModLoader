@@ -8,6 +8,7 @@ using System.Text;
 using Data.SaveData.PersistentSOs;
 using Data.UI.Controls;
 using HarmonyLib;
+using ModulusModLoader.Localization;
 using Presentation.UI;
 using Presentation.UI.Controls;
 using Presentation.UI.Menus.SettingsCategories.Controls;
@@ -61,7 +62,8 @@ internal static class ModKeybindIntegration
         string actionId,
         string displayName,
         string defaultBindingPath,
-        string category)
+        string category,
+        string? displayNameLocalizationKey)
     {
         ModKeybindSlot slot;
         lock (LockObj)
@@ -74,19 +76,22 @@ internal static class ModKeybindIntegration
             if (existing != null)
             {
                 existing.Registration = new ModKeybindRegistration(
-                    modId, actionId, displayName, defaultBindingPath, bindingGuid, category);
+                    modId, actionId, displayName, defaultBindingPath, bindingGuid, category, displayNameLocalizationKey);
                 slot = existing;
             }
             else
             {
                 slot = new ModKeybindSlot(new ModKeybindRegistration(
-                    modId, actionId, displayName, defaultBindingPath, bindingGuid, category));
+                    modId, actionId, displayName, defaultBindingPath, bindingGuid, category, displayNameLocalizationKey));
                 Slots.Add(slot);
             }
         }
 
+        string labelForLog = displayName;
+        if (!string.IsNullOrEmpty(displayNameLocalizationKey))
+            labelForLog = ModL10n.Get(modId, displayNameLocalizationKey!, displayName);
         ModulusModLoaderPlugin.Log?.LogInfo(
-            $"ModKeybind.Register: {modId}/{actionId} '{displayName}' [{category}] default={defaultBindingPath}");
+            $"ModKeybind.Register: {modId}/{actionId} '{labelForLog}' [{category}] default={defaultBindingPath}");
 
         TryEnsureOnGameAsset();
         ReinitializeRuntimeAndRepopulateUi();
@@ -165,7 +170,11 @@ internal static class ModKeybindIntegration
             {
                 if (ReferenceEquals(s.Data, __instance))
                 {
-                    __result = s.Registration.DisplayName;
+                    string? locKey = s.Registration.DisplayNameLocalizationKey;
+                    if (string.IsNullOrEmpty(locKey))
+                        __result = s.Registration.DisplayName;
+                    else
+                        __result = ModL10n.Get(s.Registration.ModId, locKey!, s.Registration.DisplayName);
                     return;
                 }
             }

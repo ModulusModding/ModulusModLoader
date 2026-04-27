@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using BepInEx.Bootstrap;
 using BepInEx.Configuration;
+using ModulusModLoader.Localization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,6 +22,29 @@ namespace ModulusModLoader.Config;
 internal static class ModConfigPanel
 {
     private static readonly Color SectionTextColor = new(0.78f, 0.86f, 0.98f);
+
+    static ModConfigPanel()
+    {
+        ModL10n.LanguageChanged += RefreshConfigPanelLocalization;
+    }
+
+    private static void RefreshConfigPanelLocalization()
+    {
+        try
+        {
+            foreach (CfgRowLocalization row in Object.FindObjectsByType<CfgRowLocalization>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+                row.Apply();
+
+            foreach (CfgSectionLocalization sec in Object.FindObjectsByType<CfgSectionLocalization>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+                sec.Apply();
+        }
+        catch (Exception ex)
+        {
+            ModulusModLoaderPlugin.Log?.LogWarning($"ModConfigPanel: language refresh: {ex.Message}");
+        }
+    }
 
     /// <summary>
     /// Removes any prior controls and rebuilds the panel for the mod identified by
@@ -48,9 +72,9 @@ internal static class ModConfigPanel
 
         foreach (IGrouping<string, ConfigEntryBase> section in sections)
         {
-            BuildSectionHeader(host, section.Key, style);
+            BuildSectionHeader(host, section.Key, style, modId);
             foreach (ConfigEntryBase entry in section.OrderBy(e => e.Definition.Key, StringComparer.OrdinalIgnoreCase))
-                BuildRow(host, entry, style);
+                BuildRow(host, entry, style, modId);
         }
     }
 
@@ -131,7 +155,7 @@ internal static class ModConfigPanel
             Object.Destroy(host.GetChild(i).gameObject);
     }
 
-    private static void BuildSectionHeader(Transform host, string name, GameUiStyle style)
+    private static void BuildSectionHeader(Transform host, string name, GameUiStyle style, string modId)
     {
         GameObject go = new("CfgSection");
         go.transform.SetParent(host, false);
@@ -140,9 +164,14 @@ internal static class ModConfigPanel
         tmp.fontSize = style.FontSizeSmall * 1.05f;
         tmp.color    = SectionTextColor;
         tmp.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
-        tmp.text     = name;
+        tmp.text     = ModL10n.Get(modId, ModConfigL10nKeys.SectionHeader(name), name);
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         go.AddComponent<LayoutElement>().minHeight = style.FontSizeSmall * 2f;
+
+        var secLoc = go.AddComponent<CfgSectionLocalization>();
+        secLoc.ModId       = modId;
+        secLoc.SectionRaw  = name;
+        secLoc.HeaderLabel = tmp;
     }
 
     private static void AddNote(Transform host, string text, GameUiStyle style)
@@ -159,8 +188,10 @@ internal static class ModConfigPanel
         go.AddComponent<LayoutElement>().minHeight = style.FontSizeSmall * 1.6f;
     }
 
-    private static void BuildRow(Transform host, ConfigEntryBase entry, GameUiStyle style)
+    private static void BuildRow(Transform host, ConfigEntryBase entry, GameUiStyle style, string modId)
     {
+        string section = string.IsNullOrWhiteSpace(entry.Definition.Section) ? "General" : entry.Definition.Section;
+        string defKey  = entry.Definition.Key;
         // Outer block: vertical (header row + optional wrapping description below).
         GameObject block = new("CfgEntry");
         block.transform.SetParent(host, false);
@@ -202,7 +233,7 @@ internal static class ModConfigPanel
         lbl.font      = style.Font;
         lbl.fontSize  = style.FontSizeSmall;
         lbl.color     = style.ColorText;
-        lbl.text      = entry.Definition.Key;
+        lbl.text      = ModL10n.Get(modId, ModConfigL10nKeys.EntryLabel(section, defKey), defKey);
         lbl.alignment = TextAlignmentOptions.MidlineLeft;
         lbl.fontStyle = FontStyles.Bold;
         lbl.textWrappingMode = TextWrappingModes.NoWrap;
@@ -212,11 +243,12 @@ internal static class ModConfigPanel
         lblLe.minWidth      = 100f;
 
         // Editor based on type (added as a sibling of the label inside the header row).
+        TMP_Dropdown? enumDropdown = null;
         Type t = entry.SettingType;
         if (t == typeof(bool))
             BuildToggle(row.transform, entry, style);
         else if (t.IsEnum)
-            BuildEnumDropdown(row.transform, entry, t, style);
+            enumDropdown = BuildEnumDropdown(row.transform, entry, t, style, modId, section, defKey);
         else if (entry.Description?.AcceptableValues is AcceptableValueList<string> sList)
             BuildStringDropdown(row.transform, entry, sList.AcceptableValues, style);
         else if (t == typeof(int) && entry.Description?.AcceptableValues is AcceptableValueRange<int> iRange)
@@ -229,21 +261,34 @@ internal static class ModConfigPanel
             BuildTextInput(row.transform, entry, style);
 
         // Description: wraps below the header row using the full width; muted, smaller.
-        string? desc = entry.Description?.Description;
-        if (!string.IsNullOrWhiteSpace(desc))
+        string descFallback = entry.Description?.Description ?? string.Empty;
+        TextMeshProUGUI? descTmp = null;
+        if (!string.IsNullOrWhiteSpace(descFallback))
         {
             GameObject descGo = new("Desc");
             descGo.transform.SetParent(block.transform, false);
-            TextMeshProUGUI descTmp = descGo.AddComponent<TextMeshProUGUI>();
+            descTmp = descGo.AddComponent<TextMeshProUGUI>();
             descTmp.font             = style.Font;
             descTmp.fontSize         = style.FontSizeSmall * 0.85f;
             descTmp.color            = style.ColorTextMuted;
-            descTmp.text             = desc!.Trim();
+            string body = ModL10n.Get(modId, ModConfigL10nKeys.EntryDescription(section, defKey), descFallback);
+            descTmp.text             = string.IsNullOrWhiteSpace(body) ? descFallback.Trim() : body.Trim();
             descTmp.alignment        = TextAlignmentOptions.TopLeft;
             descTmp.textWrappingMode = TextWrappingModes.Normal;
             descTmp.overflowMode     = TextOverflowModes.Overflow;
             descGo.AddComponent<LayoutElement>();
         }
+
+        var rowLoc = block.AddComponent<CfgRowLocalization>();
+        rowLoc.ModId                 = modId;
+        rowLoc.Section               = section;
+        rowLoc.EntryKey              = defKey;
+        rowLoc.DescriptionFallback   = descFallback;
+        rowLoc.LabelText             = lbl;
+        rowLoc.DescText              = descTmp;
+        rowLoc.EnumDropdown          = enumDropdown;
+        rowLoc.EnumRawNames          = t.IsEnum ? Enum.GetNames(t) : Array.Empty<string>();
+        rowLoc.Apply();
     }
 
     private static bool IsNumber(Type t) =>
@@ -294,15 +339,35 @@ internal static class ModConfigPanel
         return cb;
     }
 
-    private static void BuildEnumDropdown(Transform parent, ConfigEntryBase entry, Type enumType, GameUiStyle style)
+    private static TMP_Dropdown BuildEnumDropdown(
+        Transform parent,
+        ConfigEntryBase entry,
+        Type enumType,
+        GameUiStyle style,
+        string modId,
+        string section,
+        string defKey)
     {
         string[] names = Enum.GetNames(enumType);
-        TMP_Dropdown dd = MakeDropdown(parent, names, names.ToList().IndexOf(entry.BoxedValue?.ToString() ?? string.Empty), style);
+        string[] labels = LocalizedEnumOptions(modId, section, defKey, names);
+        TMP_Dropdown dd = MakeDropdown(parent, labels, names.ToList().IndexOf(entry.BoxedValue?.ToString() ?? string.Empty), style);
         dd.onValueChanged.AddListener(idx =>
         {
             try { entry.BoxedValue = Enum.Parse(enumType, names[idx]); }
             catch (Exception ex) { ModulusModLoaderPlugin.Log?.LogWarning($"ModConfigPanel: enum set failed: {ex.Message}"); }
         });
+        return dd;
+    }
+
+    private static string[] LocalizedEnumOptions(string modId, string section, string defKey, string[] rawNames)
+    {
+        var labels = new string[rawNames.Length];
+        for (int i = 0; i < rawNames.Length; i++)
+        {
+            string raw = rawNames[i];
+            labels[i] = ModL10n.Get(modId, ModConfigL10nKeys.EnumMember(section, defKey, raw), raw);
+        }
+        return labels;
     }
 
     private static void BuildStringDropdown(Transform parent, ConfigEntryBase entry, string[] options, GameUiStyle style)
@@ -620,5 +685,57 @@ internal static class ModConfigPanel
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.raycastTarget = false;
         return tmp;
+    }
+}
+
+/// <summary>Refreshes one BepInEx config row when <see cref="ModL10n.LanguageChanged"/> fires.</summary>
+internal sealed class CfgRowLocalization : MonoBehaviour
+{
+    public string ModId = "";
+    public string Section = "";
+    public string EntryKey = "";
+    public string DescriptionFallback = "";
+    public TextMeshProUGUI? LabelText;
+    public TextMeshProUGUI? DescText;
+    public TMP_Dropdown? EnumDropdown;
+    public string[] EnumRawNames = Array.Empty<string>();
+
+    public void Apply()
+    {
+        if (LabelText != null)
+            LabelText.text = ModL10n.Get(ModId, ModConfigL10nKeys.EntryLabel(Section, EntryKey), EntryKey);
+        if (DescText != null)
+        {
+            string body = ModL10n.Get(ModId, ModConfigL10nKeys.EntryDescription(Section, EntryKey), DescriptionFallback);
+            DescText.text = string.IsNullOrWhiteSpace(body) ? DescriptionFallback.Trim() : body.Trim();
+        }
+
+        if (EnumDropdown == null || EnumRawNames.Length == 0)
+            return;
+        int sel = EnumDropdown.value;
+        var options = new List<TMP_Dropdown.OptionData>();
+        foreach (string raw in EnumRawNames)
+        {
+            options.Add(new TMP_Dropdown.OptionData(
+                ModL10n.Get(ModId, ModConfigL10nKeys.EnumMember(Section, EntryKey, raw), raw)));
+        }
+        EnumDropdown.ClearOptions();
+        EnumDropdown.AddOptions(options);
+        EnumDropdown.value = Mathf.Clamp(sel, 0, options.Count - 1);
+        EnumDropdown.RefreshShownValue();
+    }
+}
+
+/// <summary>Refreshes a section subtitle in the config list when language changes.</summary>
+internal sealed class CfgSectionLocalization : MonoBehaviour
+{
+    public string ModId = "";
+    public string SectionRaw = "";
+    public TextMeshProUGUI? HeaderLabel;
+
+    public void Apply()
+    {
+        if (HeaderLabel == null) return;
+        HeaderLabel.text = ModL10n.Get(ModId, ModConfigL10nKeys.SectionHeader(SectionRaw), SectionRaw);
     }
 }
